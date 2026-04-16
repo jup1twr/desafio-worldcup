@@ -31,7 +31,7 @@ if (isset($_POST['atualizar'])) {
 // Carregar para editar
 $editar = isset($_GET['editar']) ? $conn->query("SELECT * FROM selecoes WHERE id_selecao=".$_GET['editar'])->fetch() : null;
 
-// MAPA DE BANDEIRAS (EMOJI - Compatível com todos navegadores)
+// MAPA DE BANDEIRAS
 $bandeiras = [
     'Brasil' => '🇧🇷', 'Alemanha' => '🇩🇪', 'Croácia' => '🇭🇷', 'Camarões' => '🇨🇲',
     'França' => '🇫🇷', 'Inglaterra' => '🇬🇧', 'Estados Unidos' => '🇺🇸', 'Gana' => '🇬🇭',
@@ -53,6 +53,19 @@ $dados = [];
 foreach ($grupos as $g) {
     $dados[$g] = $conn->query("SELECT * FROM selecoes WHERE grupo_selecao='$g' ORDER BY nome_selecao")->fetchAll();
 }
+
+// Gerar partidas
+$partidas = [];
+foreach($grupos as $g) {
+    if(count($dados[$g]) >= 2) {
+        $times = $dados[$g];
+        $partidas[] = ['time1' => $times[0], 'time2' => $times[1], 'grupo' => $g];
+        if(count($times) >= 4) {
+            $partidas[] = ['time1' => $times[2], 'time2' => $times[3], 'grupo' => $g];
+        }
+    }
+}
+$partidas = array_slice($partidas, 0, 8);
 ?>
 
 <!DOCTYPE html>
@@ -61,117 +74,269 @@ foreach ($grupos as $g) {
     <meta charset="UTF-8">
     <title>Copa do Mundo</title>
     <style>
-        *{margin:0;padding:0;box-sizing:border-box;}
-        body {font-family: Arial, sans-serif; padding: 20px; background-image: url('img/background-project.png'); background-size: cover; background-attachment: fixed; background-position: center; background-repeat: no-repeat;}
-        .container{max-width:1600px;margin:auto;background:rgba(255,255,255,0.95);padding:20px;border-radius:15px;}
-        h1{text-align:center;color:#1a3a5c;margin-bottom:20px;}
-        .botoes{background:#1a3a5c;padding:15px;border-radius:10px;margin-bottom:20px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap;}
-        .btn{padding:10px 20px;border:none;border-radius:5px;text-decoration:none;font-weight:bold;cursor:pointer;color:white;display:inline-block;}
-        .btn-verde{background:#27ae60;}.btn-azul{background:#2980b9;}.btn-laranja{background:#e67e22;}.btn-vermelho{background:#c0392b;}.btn-cinza{background:#7f8c8d;}
-        .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:15px;}
-        .box{background:white;border-radius:10px;overflow:hidden;box-shadow:0 3px 10px rgba(0,0,0,0.1);}
-        .titulo{background:#1a3a5c;color:white;padding:12px;text-align:center;border-bottom:3px solid #e67e22;}
-        .titulo span{background:#e67e22;padding:3px 10px;border-radius:20px;font-size:13px;margin-left:8px;}
-        .selecoes{padding:10px;}
-        .selecao{background:#f8f9fa;padding:10px;margin:8px 0;border-radius:8px;display:flex;align-items:center;gap:10px;border-left:4px solid #e67e22;}
-        .selecao input[type="checkbox"]{width:18px;height:18px;cursor:pointer;flex-shrink:0;}
-        .bandeira{font-size:28px;line-height:1;flex-shrink:0;}
-        .info{flex:1;}
-        .form-box{background:#f0f4f8;padding:20px;border-radius:10px;margin:20px 0;}
-        input,select{padding:10px;margin:5px;border:1px solid #ccc;border-radius:5px;}
-        .sem{padding:15px;color:#999;text-align:center;}
-        @media(max-width:1200px){.grid{grid-template-columns:repeat(2,1fr);}}
-        @media(max-width:600px){.grid{grid-template-columns:1fr;}}
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Helvetica';
+            padding: 20px;
+            background-image: url('img/background-project.svg');
+            background-size: cover;
+            background-attachment: fixed;
+            background-position: center;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 25px;
+            border-radius: 30px;
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(15px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        h1 { text-align: center; color: white; margin-bottom: 25px; font-size: 36px; text-shadow: 2px 2px 10px rgba(0,0,0,0.3); }
+        .botoes {
+            background: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(10px);
+            padding: 15px;
+            border-radius: 50px;
+            margin-bottom: 25px;
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 40px;
+            text-decoration: none;
+            font-weight: bold;
+            cursor: pointer;
+            color: white;
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .btn-verde { background: rgba(39, 174, 96, 0.85); }
+        .btn-azul { background: rgba(41, 128, 185, 0.85); }
+        .btn-laranja { background: rgba(230, 126, 34, 0.85); }
+        .btn-vermelho { background: rgba(192, 57, 43, 0.85); }
+        .btn-cinza { background: rgba(127, 140, 141, 0.85); }
+        
+        /* LAYOUT 2 COLUNAS: GRUPOS | PARTIDAS */
+        .layout { display: grid; grid-template-columns: 2.5fr 1fr; gap: 20px; }
+        
+        /* GRUPOS - 4 COLUNAS */
+        .grupos-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; }
+        .box {
+            border-radius: 20px;
+            overflow: hidden;
+            background: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            margin-bottom: 15px;
+        }
+        .titulo {
+            background: rgba(26, 58, 92, 0.7);
+            color: white;
+            padding: 12px;
+            text-align: center;
+            font-weight: bold;
+            border-bottom: 2px solid rgba(230, 126, 34, 0.8);
+        }
+        .selecoes { padding: 10px; }
+        .selecao {
+            background: rgba(255, 255, 255, 0.3);
+            backdrop-filter: blur(8px);
+            padding: 10px;
+            margin: 6px 0;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border-left: 4px solid rgba(230, 126, 34, 0.9);
+        }
+        .selecao input[type="checkbox"] { width: 16px; height: 16px; accent-color: #e67e22; }
+        .bandeira { font-size: 24px; }
+        .info { flex: 1; color: #1a1a2e; }
+        
+        /* PARTIDAS - BLOCO SEPARADO */
+        .partidas-bloco {
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(15px);
+            border-radius: 20px;
+            padding: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            height: fit-content;
+        }
+        .partida-card {
+            background: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 15px;
+            margin-bottom: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        .partida-times {
+            display: flex;
+            align-items: center;
+            justify-content: space-around;
+        }
+        .time { text-align: center; }
+        .time .bandeira { font-size: 32px; display: block; }
+        .time span { color: white; font-weight: bold; font-size: 14px; }
+        .vs {
+            background: rgba(230, 126, 34, 0.9);
+            color: white;
+            padding: 8px 15px;
+            border-radius: 30px;
+            font-weight: bold;
+        }
+        .partida-info {
+            text-align: center;
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid rgba(255,255,255,0.3);
+            color: white;
+            font-size: 12px;
+        }
+        
+        .form-box {
+            background: rgba(255, 255, 255, 0.25);
+            backdrop-filter: blur(15px);
+            padding: 25px;
+            border-radius: 25px;
+            margin: 20px 0;
+        }
+        input, select {
+            padding: 12px;
+            margin: 5px;
+            border-radius: 15px;
+            border: 1px solid rgba(255,255,255,0.4);
+            background: rgba(255,255,255,0.3);
+        }
+        .sem { padding: 20px; color: white; text-align: center; }
+        
+        @media (max-width: 1200px) {
+            .layout { grid-template-columns: 1fr; }
+            .grupos-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+        @media (max-width: 600px) {
+            .grupos-grid { grid-template-columns: 1fr; }
+        }
     </style>
 </head>
-<body>
-<div class="container">
-    <h1>🏆 Copa do Mundo 2026</h1>
+<!-- LAYOUT: DUAS CAIXAS DO MESMO TAMANHO, CENTRALIZADAS -->
+<div style="display: flex; justify-content: center; gap: 20px; max-width: 1200px; margin: 0 auto;">
     
-    <form method="POST">
-        <div class="botoes">
-            <a href="?novo" class="btn btn-verde">+ Nova Seleção</a>
-            <button type="button" class="btn btn-laranja" onclick="editar()">Editar</button>
-            <button type="submit" name="excluir" class="btn btn-vermelho" onclick="return confirm('Excluir selecionados?')">Excluir</button>
+    <!-- CAIXA ESQUERDA: COPA DO MUNDO (GRUPOS) -->
+    <div style="flex: 1; max-width: 700px; background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border-radius: 25px; padding: 20px; border: 1px solid rgba(255, 255, 255, 0.2);">
+        <h2 style="color: white; text-align: center; margin-bottom: 15px; text-shadow: 2px 2px 8px rgba(0,0,0,0.3); font-size: 24px;">🏆 Copa do Mundo 2026</h2>
+        
+        <form method="POST">
+            <div style="background: rgba(255, 255, 255, 0.08); backdrop-filter: blur(5px); padding: 10px; border-radius: 40px; margin-bottom: 20px; display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;">
+                <a href="?novo" style="padding: 8px 16px; background: rgba(39, 174, 96, 0.7); color: white; border-radius: 30px; text-decoration: none; font-weight: bold; font-size: 13px; border: 1px solid rgba(255,255,255,0.2);">+ Nova</a>
+                <button type="button" onclick="editar()" style="padding: 8px 16px; background: rgba(230, 126, 34, 0.7); color: white; border: none; border-radius: 30px; font-weight: bold; font-size: 13px; cursor: pointer; border: 1px solid rgba(255,255,255,0.2);">Editar</button>
+                <button type="submit" name="excluir" onclick="return confirm('Excluir selecionados?')" style="padding: 8px 16px; background: rgba(192, 57, 43, 0.7); color: white; border: none; border-radius: 30px; font-weight: bold; font-size: 13px; cursor: pointer; border: 1px solid rgba(255,255,255,0.2);">Excluir</button>
+            </div>
+        </form>
+
+        <?php if(isset($_GET['novo'])): ?>
+        <div style="background: rgba(255, 255, 255, 0.08); backdrop-filter: blur(8px); padding: 15px; border-radius: 15px; margin-bottom: 15px;">
+            <h4 style="color: white; margin-bottom: 10px;">+ Nova Seleção</h4>
+            <form method="POST">
+                <input type="text" name="nome" placeholder="Nome" required style="width: calc(50% - 5px);">
+                <select name="grupo" required style="width: calc(25% - 5px);">
+                    <option value="">Grupo</option>
+                    <?php foreach($grupos as $g): ?><option><?=$g?></option><?php endforeach; ?>
+                </select>
+                <input type="number" name="titulos" value="0" min="0" style="width: calc(25% - 5px);">
+                <button type="submit" name="salvar" style="background: rgba(41, 128, 185, 0.7); color: white; border: none; padding: 8px 15px; border-radius: 20px; font-weight: bold;">Salvar</button>
+                <a href="index.php" style="background: rgba(127, 140, 141, 0.7); color: white; padding: 8px 15px; border-radius: 20px; text-decoration: none; font-weight: bold;">Cancelar</a>
+            </form>
         </div>
-    </form>
+        <?php endif; ?>
 
-    <?php if(isset($_GET['novo'])): ?>
-    <div class="form-box">
-        <h3>+ Nova Seleção</h3>
-        <form method="POST">
-            <input type="text" name="nome" placeholder="Nome da Seleção" required>
-            <select name="grupo" required>
-                <option value="">Grupo</option>
-                <?php foreach($grupos as $g): ?><option><?=$g?></option><?php endforeach; ?>
-            </select>
-            <input type="number" name="titulos" value="0" min="0" style="width:80px;">
-            <button type="submit" name="salvar" class="btn btn-azul">Salvar</button>
-            <a href="index.php" class="btn btn-cinza">Cancelar</a>
-        </form>
-    </div>
-    <?php endif; ?>
+        <?php if($editar): ?>
+        <div style="background: rgba(255, 255, 255, 0.08); backdrop-filter: blur(8px); padding: 15px; border-radius: 15px; margin-bottom: 15px;">
+            <h4 style="color: white; margin-bottom: 10px;">✏️ Editar: <?=$editar['nome_selecao']?></h4>
+            <form method="POST">
+                <input type="hidden" name="id" value="<?=$editar['id_selecao']?>">
+                <input type="text" name="nome" value="<?=$editar['nome_selecao']?>" required style="width: calc(50% - 5px);">
+                <select name="grupo" required style="width: calc(25% - 5px);">
+                    <?php foreach($grupos as $g): ?>
+                    <option <?=$editar['grupo_selecao']==$g?'selected':''?>><?=$g?></option>
+                    <?php endforeach; ?>
+                </select>
+                <input type="number" name="titulos" value="<?=$editar['titulos_mundiais']?>" min="0" style="width: calc(25% - 5px);">
+                <button type="submit" name="atualizar" style="background: rgba(230, 126, 34, 0.7); color: white; border: none; padding: 8px 15px; border-radius: 20px; font-weight: bold;">Atualizar</button>
+                <a href="index.php" style="background: rgba(127, 140, 141, 0.7); color: white; padding: 8px 15px; border-radius: 20px; text-decoration: none; font-weight: bold;">Cancelar</a>
+            </form>
+        </div>
+        <?php endif; ?>
 
-    <?php if($editar): ?>
-    <div class="form-box">
-        <h3>✏️ Editar: <?=$editar['nome_selecao']?></h3>
-        <form method="POST">
-            <input type="hidden" name="id" value="<?=$editar['id_selecao']?>">
-            <input type="text" name="nome" value="<?=$editar['nome_selecao']?>" required>
-            <select name="grupo" required>
-                <?php foreach($grupos as $g): ?>
-                <option <?=$editar['grupo_selecao']==$g?'selected':''?>><?=$g?></option>
-                <?php endforeach; ?>
-            </select>
-            <input type="number" name="titulos" value="<?=$editar['titulos_mundiais']?>" min="0" style="width:80px;">
-            <button type="submit" name="atualizar" class="btn btn-laranja">Atualizar</button>
-            <a href="index.php" class="btn btn-cinza">Cancelar</a>
-        </form>
-    </div>
-    <?php endif; ?>
-
-    <div class="grid">
-        <?php foreach([['A','B','C'],['D','E','F'],['G','H','I'],['J','K','L']] as $col): ?>
-        <div>
-            <?php foreach($col as $g): ?>
-            <div class="box" style="margin-bottom:15px;">
-                <div class="titulo">🏁 GRUPO <?=$g?></div>
-                <div class="selecoes">
-                    <?php if(count($dados[$g])): ?>
-                        <?php foreach($dados[$g] as $s): ?>
-                        <div class="selecao">
-                            <input type="checkbox" name="ids[]" value="<?=$s['id_selecao']?>">
-                            <span class="bandeira"><?=$bandeiras[$s['nome_selecao']]??'🏳️'?></span>
-                            <div class="info">
-                                <strong><?=$s['nome_selecao']?></strong>
-                                <?php if($s['titulos_mundiais']>0): ?>
-                                    🏆 <?=$s['titulos_mundiais']?>
-                                <?php endif; ?>
+        <!-- GRUPOS - 4 COLUNAS -->
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;">
+            <?php foreach([['A','B','C'],['D','E','F'],['G','H','I'],['J','K','L']] as $col): ?>
+            <div>
+                <?php foreach($col as $g): ?>
+                <div style="background: rgba(255, 255, 255, 0.06); backdrop-filter: blur(6px); border-radius: 12px; overflow: hidden; margin-bottom: 8px; border: 1px solid rgba(255, 255, 255, 0.15);">
+                    <div style="background: rgba(26, 58, 92, 0.5); color: white; padding: 8px; text-align: center; font-weight: bold; font-size: 13px; border-bottom: 2px solid rgba(230, 126, 34, 0.6);">🏁 GRUPO <?=$g?></div>
+                    <div style="padding: 6px;">
+                        <?php if(count($dados[$g])): ?>
+                            <?php foreach($dados[$g] as $s): ?>
+                            <div style="background: rgba(255, 255, 255, 0.08); backdrop-filter: blur(4px); padding: 6px; margin: 4px 0; border-radius: 8px; display: flex; align-items: center; gap: 6px; border-left: 3px solid rgba(230, 126, 34, 0.7);">
+                                <input type="checkbox" name="ids[]" value="<?=$s['id_selecao']?>" style="width: 12px; height: 12px; accent-color: #e67e22;">
+                                <span style="font-size: 16px;"><?=$bandeiras[$s['nome_selecao']]??'🏳️'?></span>
+                                <div style="flex: 1; font-size: 11px; color: #1a1a2e;">
+                                    <strong><?=$s['nome_selecao']?></strong>
+                                    <?php if($s['titulos_mundiais']>0): ?>🏆<?=$s['titulos_mundiais']?><?php endif; ?>
+                                </div>
                             </div>
-                        </div>
-                        <?php endforeach; ?>
-                    <?php else: ?>
-                        <div class="sem">Nenhuma seleção</div>
-                    <?php endif; ?>
+                            <?php endforeach; ?>
+                        <?php else: ?>
+                            <div style="padding: 10px; color: rgba(255,255,255,0.6); text-align: center; font-size: 11px;">Nenhuma</div>
+                        <?php endif; ?>
+                    </div>
                 </div>
+                <?php endforeach; ?>
             </div>
             <?php endforeach; ?>
         </div>
-        <?php endforeach; ?>
     </div>
+    
+    <!-- CAIXA DIREITA: PRÓXIMAS PARTIDAS (MESMO TAMANHO) -->
+    <div style="flex: 1; max-width: 350px; background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border-radius: 25px; padding: 20px; border: 1px solid rgba(255, 255, 255, 0.2);">
+        <h3 style="color: white; text-align: center; margin-bottom: 15px; text-shadow: 2px 2px 8px rgba(0,0,0,0.3); font-size: 20px;">⚽ PRÓXIMAS PARTIDAS</h3>
+        
+        <?php if(count($partidas)): ?>
+            <?php foreach($partidas as $p): ?>
+            <div style="background: rgba(255, 255, 255, 0.06); backdrop-filter: blur(6px); border-radius: 15px; padding: 12px; margin-bottom: 10px; border: 1px solid rgba(255, 255, 255, 0.15);">
+                <div style="display: flex; align-items: center; justify-content: space-around;">
+                    <div style="text-align: center;">
+                        <span style="font-size: 28px; display: block;"><?=$bandeiras[$p['time1']['nome_selecao']]??'🏳️'?></span>
+                        <span style="color: white; font-weight: bold; font-size: 11px;"><?=$p['time1']['nome_selecao']?></span>
+                    </div>
+                    <div style="background: rgba(230, 126, 34, 0.7); color: white; padding: 5px 12px; border-radius: 20px; font-weight: bold; font-size: 12px;">VS</div>
+                    <div style="text-align: center;">
+                        <span style="font-size: 28px; display: block;"><?=$bandeiras[$p['time2']['nome_selecao']]??'🏳️'?></span>
+                        <span style="color: white; font-weight: bold; font-size: 11px;"><?=$p['time2']['nome_selecao']?></span>
+                    </div>
+                </div>
+                <div style="text-align: center; margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.15); color: rgba(255,255,255,0.9); font-size: 10px;">
+                    📅 Amanhã • 16:00 • Grupo <?=$p['grupo']?>
+                </div>
+            </div>
+            <?php endforeach; ?>
+            
+            <div style="text-align: center; margin-top: 15px;">
+                <a href="#" style="background: rgba(255,255,255,0.08); backdrop-filter: blur(5px); padding: 8px 15px; border-radius: 30px; color: white; text-decoration: none; font-weight: bold; font-size: 12px; border: 1px solid rgba(255,255,255,0.15); display: inline-block;">📺 Ver todos</a>
+            </div>
+        <?php else: ?>
+            <div style="padding: 20px; color: rgba(255,255,255,0.7); text-align: center; font-size: 13px;">Cadastre mais seleções!</div>
+        <?php endif; ?>
+    </div>
+    
 </div>
-
-<script>
-function editar() {
-    var checkboxes = document.querySelectorAll('input[type="checkbox"]:checked');
-    if (checkboxes.length === 0) {
-        alert('Selecione uma seleção para editar!');
-    } else if (checkboxes.length > 1) {
-        alert('Selecione apenas UMA seleção!');
-    } else {
-        window.location.href = '?editar=' + checkboxes[0].value;
-    }
-}
 </script>
 </body>
 </html>
